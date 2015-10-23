@@ -78,6 +78,7 @@ class Task(Base, Conditional, Taggable, Become):
     _first_available_file = FieldAttribute(isa='list')
     _loop                 = FieldAttribute(isa='string', private=True)
     _loop_args            = FieldAttribute(isa='list', private=True)
+    _loop_var             = FieldAttribute(isa='string', default='item')
     _name                 = FieldAttribute(isa='string', default='')
     _notify               = FieldAttribute(isa='list')
     _poll                 = FieldAttribute(isa='int')

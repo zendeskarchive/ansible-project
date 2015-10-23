@@ -549,22 +549,43 @@ More information on the patterns can be found on :doc:`intro_patterns`
 Loops and Includes
 ``````````````````
 
-In 2.0 you are able to use `with_` loops and task includes (but not playbook includes), this adds the ability to loop over the set of tasks in one shot.
-There are a couple of things that you need to keep in mind, an included task that has its own `with_` loop will overwrite the value of the special `item` variable.
-So if you want access to both the include's `item` and the current task's `item` you should use `set_fact` to create an alias to the outer one.::
+In Ansible 2.0 you are able to use `with_` loops and task includes (but not playbook includes), this adds the ability to loop over the set of tasks in one shot.
+One thing to keep in mind, a nested include task which has a task with its own `with_` loop will overwrite the value of the special `item` variable.
+If you want access to both the outer includes `item` and the current task's `item`, the `loop_var` value should be set on each loop to ensure the variable is unique
+to each loop::
 
-
-    - include: test.yml
+    # outer.yml
+    - include: inner.yml
+      loop_var: outer_item
       with_items:
         - 1
         - 2
         - 3
 
-in test.yml::
+    # inner.yml
+    - debug:
+        msg: "outer item={{outer_item}} inner item={{inner_item}}"
+      loop_var: inner_item
+      with_items:
+        - a
+        - b
+        - c
 
-    - set_fact: outer_loop="{{item}}"
+The `loop_var` option was added in 2.1.0. For those using Ansible 2.0, use `set_fact` to create an alias to the outer variable::
 
-    - debug: msg="outer item={{outer_loop}} inner item={{item}}"
+    # outer.yml
+    - include: inner.yml
+      with_items:
+        - 1
+        - 2
+        - 3
+
+    # inner.yml
+    - set_fact:
+        outer_item: "{{item}}"
+
+    - debug:
+        msg: "outer item={{outer_item}} inner item={{item}}"
       with_items:
         - a
         - b

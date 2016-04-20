@@ -84,6 +84,7 @@ class StrategyBase:
         self._inventory         = tqm.get_inventory()
         self._workers           = tqm.get_workers()
         self._notified_handlers = tqm.get_notified_handlers()
+        self._listening_handlers = tqm._listening_handlers
         self._variable_manager  = tqm.get_variable_manager()
         self._loader            = tqm.get_loader()
         self._final_q           = tqm._final_q
@@ -298,12 +299,20 @@ class StrategyBase:
 
                     original_host = get_original_host(task_result._host)
                     original_task = iterator.get_original_task(original_host, task_result._task)
-                    if handler_name not in self._notified_handlers:
-                        self._notified_handlers[handler_name] = []
 
-                    if original_host not in self._notified_handlers[handler_name]:
-                        self._notified_handlers[handler_name].append(original_host)
-                        display.vv("NOTIFIED HANDLER %s" % (handler_name,))
+                    if handler_name not in self._notified_handlers:
+                        if handler_name in self._listening_handlers:
+                            for listening_handler in self._listening_handlers[handler_name]:
+                                if original_host not in self._notified_handlers[listening_handler]:
+                                    self._notified_handlers[listening_handler].append(original_host)
+                                    display.vv("NOTIFIED HANDLER %s" % (listening_handler,))
+                        else:
+                            # FIXME: raise an error here? based on config?
+                            self._notified_handlers[handler_name] = []
+                    else:
+                        if original_host not in self._notified_handlers[handler_name]:
+                            self._notified_handlers[handler_name].append(original_host)
+                            display.vv("NOTIFIED HANDLER %s" % (handler_name,))
 
                 elif result[0] == 'register_host_var':
                     # essentially the same as 'set_host_var' below, however we

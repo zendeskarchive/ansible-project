@@ -42,7 +42,7 @@ class VarsModule(object):
         return {}
 
 
-    def get_group_vars(self, group, vault_password=None):
+    def get_group_vars(self, group, extra_vars=None, vault_password=None):
         """ Get group specific variables. """
         return {}
 

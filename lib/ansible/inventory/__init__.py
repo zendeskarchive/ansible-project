@@ -38,9 +38,11 @@ class Inventory(object):
 
     __slots__ = [ 'host_list', 'groups', '_restriction', '_also_restriction', '_subset',
                   'parser', '_vars_per_host', '_vars_per_group', '_hosts_cache', '_groups_list',
-                  '_pattern_cache', '_vault_password', '_vars_plugins', '_playbook_basedir']
+                  '_pattern_cache', '_vault_password', '_vars_plugins', '_playbook_basedir', 'extra_vars']
 
-    def __init__(self, host_list=C.DEFAULT_HOST_LIST, vault_password=None):
+    def __init__(self, host_list=C.DEFAULT_HOST_LIST, extra_vars=None, vault_password=None):
+
+        self.extra_vars = extra_vars
 
         # the host file file, or script path, or list of hosts
         # if a list, inventory data will NOT be loaded
@@ -142,12 +144,11 @@ class Inventory(object):
 
         # get group vars from group_vars/ files and vars plugins
         for group in self.groups:
-            group.vars = utils.combine_vars(group.vars, self.get_group_variables(group.name, vault_password=self._vault_password))
+            group.vars = utils.combine_vars(group.vars, self.get_group_variables(group.name, extra_vars=self.extra_vars, vault_password=self._vault_password))
 
         # get host vars from host_vars/ files and vars plugins
         for host in self.get_hosts():
             host.vars = utils.combine_vars(host.vars, self.get_host_variables(host.name, vault_password=self._vault_password))
-
 
     def _match(self, str, pattern_str):
         try:
@@ -244,7 +245,7 @@ class Inventory(object):
         return hosts
 
     def __get_hosts(self, pattern):
-        """ 
+        """
         finds hosts that positively match a particular pattern.  Does not
         take into account negative matches.
         """
@@ -289,7 +290,7 @@ class Inventory(object):
         """
         given a pattern like foo, that matches hosts, return all of hosts
         given a pattern like foo[0:5], where foo matches hosts, return the first 6 hosts
-        """ 
+        """
 
         # If there are no hosts to select from, just return the
         # empty set. This prevents trying to do selections on an empty set.
@@ -412,12 +413,12 @@ class Inventory(object):
                 return group
         return None
 
-    def get_group_variables(self, groupname, update_cached=False, vault_password=None):
+    def get_group_variables(self, groupname, extra_vars=None, update_cached=False, vault_password=None):
         if groupname not in self._vars_per_group or update_cached:
-            self._vars_per_group[groupname] = self._get_group_variables(groupname, vault_password=vault_password)
+            self._vars_per_group[groupname] = self._get_group_variables(groupname, extra_vars, vault_password=vault_password)
         return self._vars_per_group[groupname]
 
-    def _get_group_variables(self, groupname, vault_password=None):
+    def _get_group_variables(self, groupname, extra_vars=None, vault_password=None):
 
         group = self.get_group(groupname)
         if group is None:
@@ -426,13 +427,14 @@ class Inventory(object):
         vars = {}
 
         # plugin.get_group_vars retrieves just vars for specific group
-        vars_results = [ plugin.get_group_vars(group, vault_password=vault_password) for plugin in self._vars_plugins if hasattr(plugin, 'get_group_vars')]
+#       vars_results = [ plugin.get_group_vars(group, extra_vars=extra_vars, vault_password=vault_password) for plugin in self._vars_plugins if hasattr(plugin, 'get_group_vars')]
+        vars_results = [ plugin.get_group_vars(group, extra_vars, vault_password) for plugin in self._vars_plugins if hasattr(plugin, 'get_group_vars')]
         for updated in vars_results:
             if updated is not None:
                 vars = utils.combine_vars(vars, updated)
 
         # Read group_vars/ files
-        vars = utils.combine_vars(vars, self.get_group_vars(group))
+        vars = utils.combine_vars(vars, self.get_group_vars(group, extra_vars))
 
         return vars
 
@@ -483,7 +485,7 @@ class Inventory(object):
     def add_group(self, group):
         if group.name not in self.groups_list():
             self.groups.append(group)
-            self._groups_list = None  # invalidate internal cache 
+            self._groups_list = None  # invalidate internal cache
         else:
             raise errors.AnsibleError("group already in inventory: %s" % group.name)
 
@@ -504,7 +506,7 @@ class Inventory(object):
         return self._restriction
 
     def restrict_to(self, restriction):
-        """ 
+        """
         Restrict list operations to the hosts given in restriction.  This is used
         to exclude failed hosts in main playbook code, don't use this for other
         reasons.
@@ -521,14 +523,14 @@ class Inventory(object):
         if not isinstance(restriction, list):
             restriction = [ restriction ]
         self._also_restriction = restriction
-    
+
     def subset(self, subset_pattern):
-        """ 
+        """
         Limits inventory results to a subset of inventory that matches a given
         pattern, such as to select a given geographic of numeric slice amongst
-        a previous 'hosts' selection that only select roles, or vice versa.  
+        a previous 'hosts' selection that only select roles, or vice versa.
         Corresponds to --limit parameter to ansible-playbook
-        """        
+        """
         if subset_pattern is None:
             self._subset = None
         else:
@@ -548,7 +550,7 @@ class Inventory(object):
     def lift_restriction(self):
         """ Do not restrict list operations """
         self._restriction = None
-    
+
     def lift_also_restriction(self):
         """ Clears the also restriction """
         self._also_restriction = None
@@ -575,7 +577,7 @@ class Inventory(object):
             dname = os.path.dirname(self.host_list)
         if dname is None or dname == '' or dname == '.':
             cwd = os.getcwd()
-            return os.path.abspath(cwd) 
+            return os.path.abspath(cwd)
         return os.path.abspath(dname)
 
     def src(self):
@@ -598,7 +600,7 @@ class Inventory(object):
             self._playbook_basedir = dir
             # get group vars from group_vars/ files
             for group in self.groups:
-                group.vars = utils.combine_vars(group.vars, self.get_group_vars(group, new_pb_basedir=True))
+                group.vars = utils.combine_vars(group.vars, self.get_group_vars(group, self.extra_vars, new_pb_basedir=True))
             # get host vars from host_vars/ files
             for host in self.get_hosts():
                 host.vars = utils.combine_vars(host.vars, self.get_host_vars(host, new_pb_basedir=True))
@@ -610,11 +612,11 @@ class Inventory(object):
         """ Read host_vars/ files """
         return self._get_hostgroup_vars(host=host, group=None, new_pb_basedir=new_pb_basedir)
 
-    def get_group_vars(self, group, new_pb_basedir=False):
+    def get_group_vars(self, group, extra_vars=None, new_pb_basedir=False):
         """ Read group_vars/ files """
-        return self._get_hostgroup_vars(host=None, group=group, new_pb_basedir=new_pb_basedir)
+        return self._get_hostgroup_vars(host=None, group=group, extra_vars=extra_vars, new_pb_basedir=new_pb_basedir)
 
-    def _get_hostgroup_vars(self, host=None, group=None, new_pb_basedir=False):
+    def _get_hostgroup_vars(self, host=None, group=None, extra_vars=None, new_pb_basedir=False):
         """
         Loads variables from group_vars/<groupname> and host_vars/<hostname> in directories parallel
         to the inventory base directory or in the same directory as the playbook.  Variables in the playbook

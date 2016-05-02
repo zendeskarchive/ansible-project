@@ -154,7 +154,7 @@ def main(args):
         if not (os.path.isfile(playbook) or stat.S_ISFIFO(os.stat(playbook).st_mode)):
             raise errors.AnsibleError("the playbook: %s does not appear to be a file" % playbook)
 
-    inventory = ansible.inventory.Inventory(options.inventory, vault_password=vault_pass)
+    inventory = ansible.inventory.Inventory(options.inventory, extra_vars, vault_password=vault_pass)
 
     # Note: slightly wrong, this is written so that implicit localhost
     # (which is not returned in list_hosts()) is taken into account for

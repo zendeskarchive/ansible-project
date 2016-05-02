@@ -118,7 +118,7 @@ class Cli(object):
 
         extra_vars = utils.parse_extra_vars(options.extra_vars, vault_pass)
 
-        inventory_manager = inventory.Inventory(options.inventory, vault_password=vault_pass)
+        inventory_manager = inventory.Inventory(options.inventory, extra_vars, vault_password=vault_pass)
         if options.subset:
             inventory_manager.subset(options.subset)
         hosts = inventory_manager.list_hosts(pattern)
